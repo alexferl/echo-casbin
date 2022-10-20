@@ -72,7 +72,7 @@ func CasbinWithConfig(config Config) echo.MiddlewareFunc {
 			for _, role := range roles {
 				pass, err := config.Enforcer.Enforce(role, obj, act)
 				if err != nil {
-					c.Logger().Error("error enforcing")
+					c.Logger().Errorf("error enforcing: %w", err)
 					text := http.StatusText(http.StatusInternalServerError)
 					err := echo.NewHTTPError(http.StatusInternalServerError, text)
 					err.Internal = fmt.Errorf("error enforcing: %w", err)

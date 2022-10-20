@@ -65,7 +65,7 @@ func CasbinWithConfig(config Config) echo.MiddlewareFunc {
 				}
 			}
 
-			obj := c.Request().URL.Path
+			obj := c.Path()
 			act := c.Request().Method
 
 			var authorized bool

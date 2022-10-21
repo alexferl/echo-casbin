@@ -1,4 +1,4 @@
-.PHONY: dev test cover tidy fmt pre-commit
+.PHONY: dev test cover cover-html tidy fmt pre-commit
 
 .DEFAULT: help
 help:
@@ -8,6 +8,8 @@ help:
 	@echo "	run go test"
 	@echo "make cover"
 	@echo "	run go test with -cover"
+	@echo "make cover-html"
+	@echo "	run go test with -cover and show HTML"
 	@echo "make tidy"
 	@echo "	run go mod tidy"
 	@echo "make fmt"
@@ -35,6 +37,10 @@ test:
 
 cover:
 	go test -cover -v ./...
+
+cover-html:
+	go test -v -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out
 
 tidy:
 	go mod tidy

@@ -10,8 +10,8 @@ go get github.com/alexferl/echo-casbin
 ## Motivation
 You might wonder why not use the Casbin middleware in the [echo-contrib](https://github.com/labstack/echo-contrib/tree/master/casbin) repo?
 The main reason is that it doesn't provide any built-in methods for retrieving roles other than the default
-Basic Authorization header. You can write use your own function in place of it, but I wanted to have built-in methods
-that I will use in most of my projects. You can still define your function to retrieve roles, so it's still flexible.
+Basic Authorization header. You can pass your own function in place of it, but I wanted to have built-in methods
+that I will use in most of my projects. You can still define your own function to retrieve roles, so it's still flexible.
 
 ## Using
 You need to have a model and policy before you can use the middleware. You can use the ones in [here](fixtures) to get

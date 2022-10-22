@@ -22,7 +22,7 @@ This example expects the roles to be passed in the `X-Roles` header. There is **
 client doing the request is allowed to use these roles, this is beyond the scope of this middleware. A function can be
 defined with the `RolesHeaderFunc` config to do the validation.
 
-The default way the middleware gets the roles is from the key `roles` on the `echo.Context`. In a production environment,
+The default way the middleware gets the roles is from the key `roles` on the `echo.Context`. In a real application,
 another middleware running before this one would validate the client's identity and set their roles on the context so
 this middleware can access them.
 

@@ -1,8 +1,11 @@
 package casbin
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/casbin/casbin/v2"
@@ -36,6 +39,71 @@ func TestJWT(t *testing.T) {
 	e.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
+}
+
+type Response struct {
+	Message string `json:"message"`
+}
+
+func TestJWT_Defaults_ForbiddenMessage(t *testing.T) {
+	e := echo.New()
+
+	e.GET("/user", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, "ok")
+	})
+
+	config := Config{
+		Enforcer:         enforcer,
+		ForbiddenMessage: "nope",
+	}
+
+	e.Use(CasbinWithConfig(config))
+
+	req := httptest.NewRequest(http.MethodGet, "/user", nil)
+	resp := httptest.NewRecorder()
+
+	e.ServeHTTP(resp, req)
+
+	r := &Response{}
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	err = json.Unmarshal(b, r)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	assert.Equal(t, &Response{Message: "nope"}, r)
+}
+
+func TestJWTWithConfig_ForbiddenMessage(t *testing.T) {
+	e := echo.New()
+
+	e.GET("/user", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, "ok")
+	})
+
+	e.Use(Casbin(enforcer))
+
+	req := httptest.NewRequest(http.MethodGet, "/user", nil)
+	resp := httptest.NewRecorder()
+
+	e.ServeHTTP(resp, req)
+
+	r := &Response{}
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	err = json.Unmarshal(b, r)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	assert.Equal(t, &Response{Message: DefaultConfig.ForbiddenMessage}, r)
 }
 
 func TestJWTWithConfig_RolesFunc(t *testing.T) {
@@ -116,6 +184,60 @@ func TestJWTWithConfig_Return_Codes(t *testing.T) {
 			config := Config{
 				Enforcer:          enforcer,
 				EnableRolesHeader: true,
+			}
+			e.Use(CasbinWithConfig(config))
+
+			req := httptest.NewRequest(tc.method, tc.endpoint, nil)
+			req.Header.Add("X-Roles", tc.roles)
+			resp := httptest.NewRecorder()
+
+			e.ServeHTTP(resp, req)
+
+			assert.Equal(t, tc.statusCode, resp.Code)
+		})
+	}
+}
+
+func rolesHeader(s string) ([]string, error) {
+	var roles []string
+	for _, role := range strings.Split(s, ",") {
+		role = strings.TrimSpace(role)
+		roles = append(roles, role)
+	}
+
+	return roles, nil
+}
+
+func rolesHeaderErr(s string) ([]string, error) {
+	return nil, echo.NewHTTPError(http.StatusForbidden, "nope")
+}
+
+func TestJWTWithConfig_RolesHeaderFunc(t *testing.T) {
+	testCases := []struct {
+		name       string
+		fn         func(string) ([]string, error)
+		roles      string
+		endpoint   string
+		method     string
+		statusCode int
+	}{
+		{"root no role", rolesHeader, "", "/", http.MethodGet, http.StatusOK},
+		{"admin admin", rolesHeader, "user,admin", "/admin", http.MethodGet, http.StatusOK},
+		{"error", rolesHeaderErr, "", "/", http.MethodGet, http.StatusForbidden},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := echo.New()
+
+			e.Any(tc.endpoint, func(c echo.Context) error {
+				return c.JSON(http.StatusOK, "ok")
+			})
+
+			config := Config{
+				Enforcer:          enforcer,
+				EnableRolesHeader: true,
+				RolesHeaderFunc:   tc.fn,
 			}
 			e.Use(CasbinWithConfig(config))
 

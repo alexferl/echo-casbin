@@ -11,11 +11,21 @@ go get github.com/alexferl/echo-casbin
 You might wonder why not use the Casbin middleware in the [echo-contrib](https://github.com/labstack/echo-contrib/tree/master/casbin) repo?
 The main reason is that it doesn't provide any built-in methods for retrieving roles other than the default
 Basic Authorization header. You can write use your own function in place of it, but I wanted to have built-in methods
-I will use in most of my projects. You can still define your function to retrieve roles, so it's still flexible.
+that I will use in most of my projects. You can still define your function to retrieve roles, so it's still flexible.
 
 ## Using
+You need to have a model and policy before you can use the middleware. You can use the ones in [here](fixtures) to get
+started.
 
 ### Code example
+This example expects the roles to be passed in the `X-Roles` header. There is **no** validation done to make sure the
+client doing the request is allowed to use these roles, this is beyond the scope of this middleware. A function can be
+defined with the `RolesHeaderFunc` config to do the validation.
+
+The default way the middleware gets the roles is from the key `roles` on the `echo.Context`. In a production environment,
+another middleware running before this one would validate the client's identity and set their roles on the context so
+this middleware can access them.
+
 ```go
 package main
 
@@ -35,7 +45,7 @@ func main() {
 	})
 
 	e.GET("/user", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, "ok")
+		return c.JSON(http.StatusOK, "user")
 	})
 
 	enforcer, err := casbin.NewEnforcer("/path/to/model.conf", "/path/to/policy.csv")
@@ -43,10 +53,32 @@ func main() {
 		panic(err)
 	}
 
-	e.Use(mw.Casbin(enforcer))
+	config := mw.Config{
+		Enforcer:          enforcer,
+		EnableRolesHeader: true,
+	}
+	e.Use(mw.CasbinWithConfig(config))
 
 	e.Logger.Fatal(e.Start("localhost:1323"))
 }
+```
+
+Making a request to non-protected endpoint:
+```shell
+curl http://localhost:1323
+"ok"
+```
+
+Making a request to a protected endpoint:
+```shell
+curl http://localhost:1323/user
+{"message":"Access to this resource has been restricted"}
+```
+
+Making a request to a protected endpoint with the right role:
+```shell
+curl http://localhost:1323/user -H 'X-Roles: user'
+"user"
 ```
 
 ### Configuration
@@ -78,6 +110,15 @@ type Config struct {
 	// Roles should be separated by commas. E.g. "role1,role2".
 	// Optional. Defaults to false.
 	RolesHeader string
+
+	// RolesHeaderFunc defines the function that will validate that
+	// a client is allowed to the use roles they passed via the RolesHeader.
+	// The RolesHeader value will be passed unmodified, so you will need
+	// to parse it in this function yourself. The DefaultRole will be passed
+	// if the RolesHeader is empty. The roles that you want to have
+	// enforced will need to be returned in a slice: []string{"role1, "role2"}.
+	// Optional.
+	RolesHeaderFunc func(string) ([]string, error)
 
 	// RolesFunc defines the function that will retrieve the roles
 	// to be passed to the Enforcer.

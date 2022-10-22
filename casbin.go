@@ -1,7 +1,6 @@
 package casbin
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -38,11 +37,20 @@ type Config struct {
 	// Optional. Defaults to false.
 	RolesHeader string
 
+	// RolesHeaderFunc defines the function that will validate that
+	// a client is allowed to the use roles they passed via the RolesHeader.
+	// The RolesHeader value will be passed unmodified, so you will need
+	// to parse it in this function yourself. The DefaultRole will be passed
+	// if the RolesHeader is empty. The roles that you want to have
+	// enforced will need to be returned in a slice: []string{"role1, "role2"}.
+	// Optional.
+	RolesHeaderFunc func(string) ([]string, error)
+
 	// RolesFunc defines the function that will retrieve the roles
 	// to be passed to the Enforcer.
 	// Takes precedence over ContextKey and RolesHeader if they're defined.
 	// Optional.
-	RolesFunc func(c echo.Context) ([]string, error)
+	RolesFunc func(echo.Context) ([]string, error)
 
 	// ForbiddenMessage defines the message that will be
 	// returned when authorization fails.
@@ -121,13 +129,22 @@ func CasbinWithConfig(config Config) echo.MiddlewareFunc {
 
 				if len(roles) < 1 && config.EnableRolesHeader {
 					rolesHeader := c.Request().Header.Get(config.RolesHeader)
+
 					if rolesHeader == "" {
 						rolesHeader = config.DefaultRole
 					}
 
-					for _, role := range strings.Split(rolesHeader, ",") {
-						role = strings.TrimSpace(role)
-						roles = append(roles, role)
+					if config.RolesHeaderFunc != nil {
+						var err error
+						roles, err = config.RolesHeaderFunc(rolesHeader)
+						if err != nil {
+							return err
+						}
+					} else {
+						for _, role := range strings.Split(rolesHeader, ",") {
+							role = strings.TrimSpace(role)
+							roles = append(roles, role)
+						}
 					}
 				}
 			}
@@ -162,7 +179,7 @@ func CasbinWithConfig(config Config) echo.MiddlewareFunc {
 				if config.FailureFunc != nil {
 					config.FailureFunc(roles, obj, act)
 				}
-				err := echo.NewHTTPError(http.StatusForbidden, errors.New(config.ForbiddenMessage))
+				err := echo.NewHTTPError(http.StatusForbidden, config.ForbiddenMessage)
 				return err
 			}
 

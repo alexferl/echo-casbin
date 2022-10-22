@@ -124,7 +124,7 @@ type Config struct {
 	// to be passed to the Enforcer.
 	// Takes precedence over ContextKey and RolesHeader if they're defined.
 	// Optional.
-	RolesFunc func(c echo.Context) ([]string, error)
+	RolesFunc func(echo.Context) ([]string, error)
 
 	// ForbiddenMessage defines the message that will be
 	// returned when authorization fails.

@@ -160,9 +160,6 @@ func CasbinWithConfig(config Config) echo.MiddlewareFunc {
 			for _, role := range roles {
 				pass, err := config.Enforcer.Enforce(role, obj, act)
 				if err != nil {
-					c.Logger().Errorf("failed enforcing: %v", err)
-					text := http.StatusText(http.StatusInternalServerError)
-					err := echo.NewHTTPError(http.StatusInternalServerError, text)
 					return err
 				}
 

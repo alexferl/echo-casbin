@@ -122,7 +122,23 @@ func CasbinWithConfig(config Config) echo.MiddlewareFunc {
 				}
 			} else {
 				var ok bool
-				roles, ok = c.Get(config.ContextKey).([]string)
+				k := c.Get(config.ContextKey)
+				if k != nil {
+					switch k.(type) {
+					case []string:
+						roles = k.([]string)
+						ok = true
+					case []interface{}:
+						for _, role := range k.([]interface{}) {
+							_, str := role.(string)
+							if str {
+								roles = append(roles, role.(string))
+							}
+						}
+						ok = true
+					}
+				}
+
 				if !ok {
 					roles = []string{}
 				}

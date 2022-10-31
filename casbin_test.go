@@ -252,25 +252,89 @@ func TestJWTWithConfig_RolesHeaderFunc(t *testing.T) {
 	}
 }
 
-func TestJWTWithConfig_Skipper(t *testing.T) {
-	e := echo.New()
-
-	e.GET("/", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, "ok")
-	})
-
-	config := Config{
-		Enforcer: enforcer,
-		Skipper:  func(c echo.Context) bool { return true },
+func TestJWTWithConfig_RolesContext_Slice_String(t *testing.T) {
+	testCases := []struct {
+		name       string
+		roles      []string
+		endpoint   string
+		method     string
+		statusCode int
+	}{
+		{"root no role", []string{}, "/", http.MethodGet, http.StatusOK},
+		{"user user", []string{"user"}, "/user", http.MethodGet, http.StatusOK},
+		{"admin admin", []string{"user", "admin"}, "/admin", http.MethodGet, http.StatusOK},
 	}
-	e.Use(CasbinWithConfig(config))
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	resp := httptest.NewRecorder()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := echo.New()
 
-	e.ServeHTTP(resp, req)
+			e.Any(tc.endpoint, func(c echo.Context) error {
+				assert.Equal(t, tc.roles, c.Get("roles"))
+				return c.JSON(http.StatusOK, "ok")
+			})
 
-	assert.Equal(t, http.StatusOK, resp.Code)
+			e.Use(
+				func(next echo.HandlerFunc) echo.HandlerFunc {
+					return func(c echo.Context) error {
+						c.Set("roles", tc.roles)
+						return next(c)
+					}
+				},
+				Casbin(enforcer),
+			)
+
+			req := httptest.NewRequest(tc.method, tc.endpoint, nil)
+			resp := httptest.NewRecorder()
+
+			e.ServeHTTP(resp, req)
+
+			assert.Equal(t, tc.statusCode, resp.Code)
+		})
+	}
+}
+
+func TestJWTWithConfig_RolesContext_Slice_Any(t *testing.T) {
+	testCases := []struct {
+		name       string
+		roles      []any
+		endpoint   string
+		method     string
+		statusCode int
+	}{
+		{"root no role", []any{}, "/", http.MethodGet, http.StatusOK},
+		{"user user", []any{"user"}, "/user", http.MethodGet, http.StatusOK},
+		{"admin admin", []any{"user", "admin"}, "/admin", http.MethodGet, http.StatusOK},
+		{"skip invalid roles", []any{1, 2.0, []string{"nope"}, "user"}, "/user", http.MethodGet, http.StatusOK},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := echo.New()
+
+			e.Any(tc.endpoint, func(c echo.Context) error {
+				assert.Equal(t, tc.roles, c.Get("roles"))
+				return c.JSON(http.StatusOK, "ok")
+			})
+
+			e.Use(
+				func(next echo.HandlerFunc) echo.HandlerFunc {
+					return func(c echo.Context) error {
+						c.Set("roles", tc.roles)
+						return next(c)
+					}
+				},
+				Casbin(enforcer),
+			)
+
+			req := httptest.NewRequest(tc.method, tc.endpoint, nil)
+			resp := httptest.NewRecorder()
+
+			e.ServeHTTP(resp, req)
+
+			assert.Equal(t, tc.statusCode, resp.Code)
+		})
+	}
 }
 
 func TestJWTWithConfig_Enforcer_Panic(t *testing.T) {

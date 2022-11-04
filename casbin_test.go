@@ -377,3 +377,23 @@ func TestJWTWithConfig_Functions(t *testing.T) {
 		})
 	}
 }
+
+func TestJWTWithConfig_Skipper(t *testing.T) {
+	e := echo.New()
+
+	e.GET("/", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, "ok")
+	})
+
+	e.Use(CasbinWithConfig(Config{
+		Enforcer: enforcer,
+		Skipper:  func(c echo.Context) bool { return true },
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	resp := httptest.NewRecorder()
+
+	e.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+}
